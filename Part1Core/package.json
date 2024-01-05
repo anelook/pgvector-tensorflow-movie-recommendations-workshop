@@ -1,0 +1,13 @@
+{
+  "name": "part1core",
+  "version": "1.0.0",
+  "description": "Core functionality: Generating embeddings and finding closest vectors",
+  "main": "encoder.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@tensorflow-models/universal-sentence-encoder": "^1.3.3",
+    "@tensorflow/tfjs-node": "^4.15.0"
+  }
+}
