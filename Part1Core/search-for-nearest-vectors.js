@@ -1,8 +1,8 @@
-// Step 2. Access Postgres database
-
 require('dotenv').config();
+const fs = require('fs');
 const pg = require('pg');
-const moviePlots = require("./movie-plots.json");
+require('@tensorflow/tfjs-node');
+const use = require('@tensorflow-models/universal-sentence-encoder');
 
 const config = {
     user: process.env.PG_NAME,
@@ -16,13 +16,19 @@ const config = {
     },
 };
 
-const client = new pg.Client(config);
-await client.connect();
-try {
-    const pgResponse = await client.query(`SELECT count(*) FROM movie_plots`);
-    console.log(pgResponse.rows);
-} catch (err) {
-    console.error(err);
-} finally {
-    await client.end();
-}
+use.load().then(async model => {
+    const embeddings = await model.embed("a lot of cute puppies");
+    const embeddingArray = embeddings.arraySync()[0];
+
+    const client = new pg.Client(config);
+    await client.connect();
+    try {
+        const pgResponse = await client.query(
+            `SELECT * FROM movie_plots ORDER BY embedding <-> '${JSON.stringify(embeddingArray)}' LIMIT 5;`);
+        console.log(pgResponse.rows);
+    } catch (err) {
+        console.error(err);
+    } finally {
+        await client.end()
+    }
+});

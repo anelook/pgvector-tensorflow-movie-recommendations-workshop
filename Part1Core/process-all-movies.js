@@ -1,18 +1,32 @@
-// Step 2. Access Postgres database
-
 require('dotenv').config();
-const pg = require('pg');
-const moviePlots = require("./movie-plots.json");
+const fs = require('fs');
+require('@tensorflow/tfjs-node');
+const use = require('@tensorflow-models/universal-sentence-encoder');
 const pgp = require('pg-promise')({
     capSQL: true // capitalize all generated SQL
 });
+const moviePlots = require("./movie-plots.json");//.slice(0, 500);
+
+const config = {
+    user: process.env.PG_NAME,
+    password: process.env.PG_PASSWORD,
+    host: process.env.PG_HOST,
+    port: process.env.PG_PORT,
+    database: "defaultdb",
+    ssl: {
+        rejectUnauthorized: true,
+        ca: fs.readFileSync('./ca.pem').toString(),
+    },
+};
+
 const db = pgp(config);
 
-const storeInPG = async (moviePlots) => {
+const storeInPG = (moviePlots) => {
+    // set of columns
     const columns = new pgp.helpers.ColumnSet(['title', 'director', 'plot', 'year', 'wiki', 'cast', 'genre', 'embedding'], {table: 'movie_plots'});
 
     const values = [];
-    for(let i = 0; i < moviePlots.length; i++) {
+    for (let i = 0; i < moviePlots.length; i++) {
         values.push({
             title: moviePlots[i]['Title'],
             director: moviePlots[i]['Director'],
@@ -25,23 +39,24 @@ const storeInPG = async (moviePlots) => {
         })
     }
 
+    // generating a multi-row insert query:
     const query = pgp.helpers.insert(values, columns);
-    await db.none(query);
+
+    // executing the query:
+    db.none(query).then();
 }
 
 use.load().then(async model => {
-    const batchSize = 1000;
+    const batchSize = 200;
     for (let start = 0; start < moviePlots.length; start += batchSize) {
         const end = Math.min(start + batchSize, moviePlots.length);
-        console.log(`Processing items from ${start} till ${end}.`);
-        const movieBatch = moviePlots.slice(start, end);
-        const plotDescriptions = movieBatch.map(plot => plot['Plot']);
-        const embeddingsRequest = await model.embed(plotDescriptions);
-        const embeddings = embeddingsRequest.arraySync();
-
-        for (let i = 0; i < movieBatch.length; i++) {
-            movieBatch[i]['embedding'] = embeddings[i];
+        console.log(`Processing starting from ${start} with the step ${batchSize} of total amount ${moviePlots.length}.`);
+        const plotDescriptions = moviePlots.slice(start, end).map(moviePlot => moviePlot.Plot);
+        const embeddings = await model.embed(plotDescriptions);
+        const vectors = [...embeddings.arraySync()];
+        for (let i = start; i < end; i++) {
+            moviePlots[i]['embedding'] = vectors[i - start];
         }
-        await storeInPG(movieBatch);
+        storeInPG(moviePlots.slice(start, end));
     }
 });
