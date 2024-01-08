@@ -47,7 +47,9 @@ const storeInPG = (moviePlots) => {
 }
 
 use.load().then(async model => {
-    const batchSize = 200;
+    // Select batchSize depending on your machine's available resources.
+    // When running on GitPod 150-200 is upper limit before TF starts bringing memory warnings
+    const batchSize = 150;
     for (let start = 0; start < moviePlots.length; start += batchSize) {
         const end = Math.min(start + batchSize, moviePlots.length);
         console.log(`Processing starting from ${start} with the step ${batchSize} of total amount ${moviePlots.length}.`);
